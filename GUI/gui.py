@@ -21,26 +21,25 @@ class AppGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Variables de clase
+        # Variables para guardar datos y archivo
         self.df: Optional[pd.DataFrame] = None
         self.archivo_excel: Optional[str] = None
+        self.campos_a_actualizar = []
 
-        # Configurar ventana
+        # Configurar ventana principal
         self.title("Helados Cali - Sistema de Gestión")
         self.geometry("1000x600")
 
-        # Configurar diseño de cuadrícula
+        # Configurar cuadrícula para dividir ventana
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # Crear panel lateral con widgets
+        # Crear panel lateral y marco principal
         self.crear_panel_lateral()
-        
-        # Crear marco principal
         self.crear_marco_principal()
 
     def crear_panel_lateral(self):
-        """Crea el panel lateral con sus botones y elementos"""
+        """Crea el panel lateral con botones y título"""
         self.sidebar_frame = ctk.CTkFrame(
             self, 
             fg_color=COLORES["primario"],
@@ -50,7 +49,7 @@ class AppGUI(ctk.CTk):
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
 
-        # Título del menú
+        # Título del menú lateral
         self.logo_label = ctk.CTkLabel(
             self.sidebar_frame,
             text="Menú Principal",
@@ -59,34 +58,34 @@ class AppGUI(ctk.CTk):
         )
         self.logo_label.grid(row=0, column=0, padx=20, pady=20)
 
-        # Botón para cargar Excel
+        # Botón para cargar Excel con selección previa
         self.btn_cargar_excel = ctk.CTkButton(
             self.sidebar_frame,
             text="Cargar Excel",
             fg_color=COLORES["secundario"],
             text_color=COLORES["texto_claro"],
-            hover_color="#AA1518",  # Rojo más oscuro para hover
+            hover_color="#AA1518",
             command=self.cargar_excel
         )
         self.btn_cargar_excel.grid(row=1, column=0, padx=20, pady=10)
 
-        # Botón para mostrar datos
+        # Botón para mostrar datos cargados
         self.btn_mostrar_datos = ctk.CTkButton(
             self.sidebar_frame,
             text="Mostrar Datos",
             fg_color=COLORES["secundario"],
             text_color=COLORES["texto_claro"],
-            hover_color="#AA1518",  # Rojo más oscuro para hover
+            hover_color="#AA1518",
             command=self.mostrar_datos
         )
         self.btn_mostrar_datos.grid(row=2, column=0, padx=20, pady=10)
 
     def crear_marco_principal(self):
-        """Crea el marco principal y sus elementos"""
+        """Marco principal con etiqueta y área de texto"""
         self.main_frame = ctk.CTkFrame(self, fg_color="#ffffff")
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
-        # Etiqueta de bienvenida
+        # Etiqueta principal
         self.main_label = ctk.CTkLabel(
             self.main_frame,
             text="Sistema de Gestión de Productos",
@@ -95,19 +94,53 @@ class AppGUI(ctk.CTk):
         )
         self.main_label.pack(pady=30)
 
-        # Área de texto para mostrar información
+        # Área de texto para mostrar mensajes o datos
         self.text_area = ctk.CTkTextbox(
             self.main_frame,
             width=600,
             height=400,
             font=ctk.CTkFont(size=12),
             text_color=COLORES["texto_oscuro"],
-            fg_color="#F5F5F5"  # Fondo gris claro para el área de texto
+            fg_color="#F5F5F5"
         )
         self.text_area.pack(pady=10, padx=10, fill="both", expand=True)
 
     def cargar_excel(self):
-        """Maneja la carga del archivo Excel"""
+        """Muestra ventana para seleccionar campos a actualizar"""
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Selecciona campos a actualizar")
+        ventana.geometry("350x400")
+
+        opciones = ["costAct", "costAnt", "costProm", "precioi1", "precioi2", "precioi3"]
+
+        label = ctk.CTkLabel(ventana, text="Selecciona los campos a actualizar:", font=ctk.CTkFont(size=14, weight="bold"))
+        label.pack(pady=10)
+
+        self.check_vars = {}
+
+        for campo in opciones:
+            var = tk.BooleanVar(value=False)
+            cb = ctk.CTkCheckBox(ventana, text=campo, variable=var)
+            cb.pack(anchor="w", padx=20, pady=5)
+            self.check_vars[campo] = var
+
+        btn_confirmar = ctk.CTkButton(
+            ventana, 
+            text="Confirmar selección y cargar Excel", 
+            command=lambda v=ventana: self.confirmar_campos_y_cargar(v)
+        )
+        btn_confirmar.pack(pady=20)
+
+    def confirmar_campos_y_cargar(self, ventana_popup):
+        """Carga el Excel tras confirmar selección de campos"""
+        campos_seleccionados = [campo for campo, var in self.check_vars.items() if var.get()]
+
+        if not campos_seleccionados:
+            self.mostrar_mensaje("Error: Debes seleccionar al menos un campo para actualizar.")
+            return
+
+        ventana_popup.destroy()
+
         try:
             filename = filedialog.askopenfilename(
                 title="Seleccionar archivo Excel",
@@ -118,44 +151,39 @@ class AppGUI(ctk.CTk):
                 self.archivo_excel = filename
                 self.df = pd.read_excel(filename)
                 
-                # Verificar columna requerida
                 if 'codprod' not in self.df.columns:
                     self.mostrar_mensaje("Error: El archivo debe contener la columna 'codprod'")
                     self.df = None
                     return
-                
-                # Verificar columnas recomendadas
-                columnas_recomendadas = ['costAct', 'precio']
-                columnas_faltantes = [col for col in columnas_recomendadas if col not in self.df.columns]
-                
+
                 mensaje = f"Archivo cargado exitosamente.\nNombre: {filename}\n"
+                mensaje += f"Campos seleccionados para actualizar: {', '.join(campos_seleccionados)}\n"
                 mensaje += f"Columnas encontradas: {', '.join(self.df.columns)}\n"
-                
-                if columnas_faltantes:
-                    mensaje += f"\nAdvertencia: Columnas recomendadas faltantes: {', '.join(columnas_faltantes)}"
-                
+
+                faltantes = [campo for campo in campos_seleccionados if campo not in self.df.columns]
+                if faltantes:
+                    mensaje += f"\nAdvertencia: Los siguientes campos no se encuentran en el archivo: {', '.join(faltantes)}"
+
                 self.mostrar_mensaje(mensaje)
-        
+
+                self.campos_a_actualizar = campos_seleccionados
+
         except Exception as e:
             self.mostrar_mensaje(f"Error al cargar el archivo: {str(e)}")
 
     def mostrar_datos(self):
-        """Muestra los datos del Excel en el área de texto"""
+        """Muestra resumen y primeros 10 registros del Excel cargado"""
         if self.df is not None:
-            # Mostrar información básica
             info = f"Resumen del archivo:\n"
             info += f"Total de registros: {len(self.df)}\n"
             info += f"Columnas disponibles: {', '.join(self.df.columns)}\n\n"
-            
-            # Mostrar primeros 10 registros
             info += "Primeros 10 registros:\n"
             info += str(self.df.head(10))
-            
             self.mostrar_mensaje(info)
         else:
             self.mostrar_mensaje("No hay datos cargados. Por favor, cargue un archivo Excel primero.")
 
     def mostrar_mensaje(self, mensaje: str):
-        """Muestra un mensaje en el área de texto"""
+        """Muestra un texto en el área principal"""
         self.text_area.delete("1.0", tk.END)
-        self.text_area.insert("1.0", mensaje) 
+        self.text_area.insert("1.0", mensaje)
