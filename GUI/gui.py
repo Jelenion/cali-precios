@@ -107,9 +107,25 @@ class AppGUI(ctk.CTk):
 
     def cargar_excel(self):
         """Muestra ventana para seleccionar campos a actualizar"""
-        ventana = ctk.CTkToplevel(self)
+        # Evitar abrir múltiples ventanas
+        if hasattr(self, "ventana_seleccion") and self.ventana_seleccion.winfo_exists():
+            self.ventana_seleccion.lift()
+            self.ventana_seleccion.focus_force()
+            return
+
+        self.ventana_seleccion = ctk.CTkToplevel(self)
+        ventana = self.ventana_seleccion
         ventana.title("Selecciona campos a actualizar")
         ventana.geometry("350x400")
+        ventana.lift()
+        ventana.attributes("-topmost", True)
+        ventana.focus_force()
+        ventana.grab_set()
+
+        # Solo enlaza los eventos cuando la ventana secundaria está abierta
+        self.main_frame.bind("<Button>", self.hacer_alerta_si_bloqueada)
+        self.main_frame.bind("<Key>", self.hacer_alerta_si_bloqueada)
+        self.bind("<FocusIn>", self.hacer_alerta_si_bloqueada)
 
         opciones = ["costAct", "costAnt", "costProm", "precioi1", "precioi2", "precioi3"]
 
@@ -140,6 +156,11 @@ class AppGUI(ctk.CTk):
             return
 
         ventana_popup.destroy()
+        self.ventana_seleccion = None
+        # Desenlaza los eventos cuando la ventana secundaria se cierra
+        self.unbind("<FocusIn>")
+        self.main_frame.unbind("<Button>")
+        self.main_frame.unbind("<Key>")
 
         try:
             filename = filedialog.askopenfilename(
@@ -187,3 +208,9 @@ class AppGUI(ctk.CTk):
         """Muestra un texto en el área principal"""
         self.text_area.delete("1.0", tk.END)
         self.text_area.insert("1.0", mensaje)
+
+    def hacer_alerta_si_bloqueada(self, event=None):
+        """Emite un sonido de alerta si la ventana secundaria está abierta"""
+        if hasattr(self, "ventana_seleccion") and self.ventana_seleccion is not None and self.ventana_seleccion.winfo_exists():
+            self.bell()
+            return "break"  # Evita que el evento siga propagándose
