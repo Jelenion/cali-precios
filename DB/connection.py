@@ -2,10 +2,10 @@
 import pyodbc
 
 # Parámetros de conexión
-server = 'NOMBRE_DEL_SERVIDOR\\NOMBRE_INSTANCIA'  # Ejemplo: 'localhost\\SQLEXPRESS'
-database = 'NombreDeTuBaseDeDatos'
-username = 'SA'
-password = 'Saint123456'
+server = 'DESKTOP-ETTD339'  # Ejemplo: 'localhost\\SQLEXPRESS'
+database = 'hcdb2'
+username = 'sa'
+password = '12345678'
 
 try:
     # Establecer conexión
