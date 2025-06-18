@@ -36,27 +36,25 @@ class AppGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Variables de clase
+        # Variables para guardar datos y archivo
         self.df: Optional[pd.DataFrame] = None
         self.archivo_excel: Optional[str] = None
-        self.campos_seleccionados = []
+        self.campos_a_actualizar = []
 
-        # Configurar ventana
+        # Configurar ventana principal
         self.title("Helados Cali - Sistema de Gestión")
         self.geometry("1100x700")
 
-        # Configurar diseño de cuadrícula
+        # Configurar cuadrícula para dividir ventana
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # Crear panel lateral con widgets
+        # Crear panel lateral y marco principal
         self.crear_panel_lateral()
-        
-        # Crear marco principal
         self.crear_marco_principal()
 
     def crear_panel_lateral(self):
-        """Crea el panel lateral con sus botones y elementos"""
+        """Crea el panel lateral con botones y título"""
         self.sidebar_frame = ctk.CTkFrame(
             self, 
             fg_color=COLORES["primario"],
@@ -66,7 +64,7 @@ class AppGUI(ctk.CTk):
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(6, weight=1)
 
-        # Título del menú
+        # Título del menú lateral
         self.logo_label = ctk.CTkLabel(
             self.sidebar_frame,
             text="Menú Principal",
@@ -75,7 +73,7 @@ class AppGUI(ctk.CTk):
         )
         self.logo_label.grid(row=0, column=0, padx=20, pady=20)
 
-        # Botón para cargar Excel
+        # Botón para cargar Excel con selección previa
         self.btn_cargar_excel = ctk.CTkButton(
             self.sidebar_frame,
             text="Cargar Excel",
@@ -86,7 +84,7 @@ class AppGUI(ctk.CTk):
         )
         self.btn_cargar_excel.grid(row=1, column=0, padx=20, pady=10)
 
-        # Botón para mostrar datos
+        # Botón para mostrar datos cargados
         self.btn_mostrar_datos = ctk.CTkButton(
             self.sidebar_frame,
             text="Mostrar Datos",
@@ -120,11 +118,11 @@ class AppGUI(ctk.CTk):
         self.btn_actualizar.grid(row=4, column=0, padx=20, pady=10)
 
     def crear_marco_principal(self):
-        """Crea el marco principal y sus elementos"""
+        """Marco principal con etiqueta y área de texto"""
         self.main_frame = ctk.CTkFrame(self, fg_color="#ffffff")
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
-        # Etiqueta de bienvenida
+        # Etiqueta principal
         self.main_label = ctk.CTkLabel(
             self.main_frame,
             text="Sistema de Gestión de Productos",
@@ -133,7 +131,7 @@ class AppGUI(ctk.CTk):
         )
         self.main_label.pack(pady=30)
 
-        # Área de texto para mostrar información
+        # Área de texto para mostrar mensajes o datos
         self.text_area = ctk.CTkTextbox(
             self.main_frame,
             width=700,
@@ -145,7 +143,62 @@ class AppGUI(ctk.CTk):
         self.text_area.pack(pady=10, padx=10, fill="both", expand=True)
 
     def cargar_excel(self):
-        """Maneja la carga del archivo Excel"""
+        """Muestra ventana para seleccionar campos a actualizar"""
+        # Evitar abrir múltiples ventanas
+        if hasattr(self, "ventana_seleccion") and self.ventana_seleccion.winfo_exists():
+            self.ventana_seleccion.lift()
+            self.ventana_seleccion.focus_force()
+            return
+
+        self.ventana_seleccion = ctk.CTkToplevel(self)
+        ventana = self.ventana_seleccion
+        ventana.title("Selecciona campos a actualizar")
+        ventana.geometry("350x400")
+        ventana.lift()
+        ventana.attributes("-topmost", True)
+        ventana.focus_force()
+        ventana.grab_set()
+
+        # Solo enlaza los eventos cuando la ventana secundaria está abierta
+        self.main_frame.bind("<Button>", self.hacer_alerta_si_bloqueada)
+        self.main_frame.bind("<Key>", self.hacer_alerta_si_bloqueada)
+        self.bind("<FocusIn>", self.hacer_alerta_si_bloqueada)
+
+        opciones = ["CostAct", "CostAnt", "costProm", "PrecioIU1", "PrecioIU2", "PrecioIU3"]
+
+        label = ctk.CTkLabel(ventana, text="Selecciona los campos a actualizar:", font=ctk.CTkFont(size=14, weight="bold"))
+        label.pack(pady=10)
+
+        self.check_vars = {}
+
+        for campo in opciones:
+            var = tk.BooleanVar(value=False)
+            cb = ctk.CTkCheckBox(ventana, text=campo, variable=var)
+            cb.pack(anchor="w", padx=20, pady=5)
+            self.check_vars[campo] = var
+
+        btn_confirmar = ctk.CTkButton(
+            ventana, 
+            text="Confirmar selección y cargar Excel", 
+            command=lambda v=ventana: self.confirmar_campos_y_cargar(v)
+        )
+        btn_confirmar.pack(pady=20)
+
+    def confirmar_campos_y_cargar(self, ventana_popup):
+        """Carga el Excel tras confirmar selección de campos"""
+        campos_seleccionados = [campo for campo, var in self.check_vars.items() if var.get()]
+
+        if not campos_seleccionados:
+            self.mostrar_mensaje("Error: Debes seleccionar al menos un campo para actualizar.")
+            return
+
+        ventana_popup.destroy()
+        self.ventana_seleccion = None
+        # Desenlaza los eventos cuando la ventana secundaria se cierra
+        self.unbind("<FocusIn>")
+        self.main_frame.unbind("<Button>")
+        self.main_frame.unbind("<Key>")
+
         try:
             filename = filedialog.askopenfilename(
                 title="Seleccionar archivo Excel",
@@ -156,21 +209,31 @@ class AppGUI(ctk.CTk):
                 self.archivo_excel = filename
                 self.df = pd.read_excel(filename)
                 
-                # Verificar columna requerida
-                if 'codprod' not in self.df.columns:
+                if 'CodProd' not in self.df.columns:
                     self.mostrar_mensaje("Error: El archivo debe contener la columna 'codprod'")
                     self.df = None
                     return
                 
+                # Verificar columnas recomendadas
+                columnas_recomendadas = ['costAct', 'precio']
+                columnas_faltantes = [col for col in columnas_recomendadas if col not in self.df.columns]
+                
                 mensaje = f"Archivo cargado exitosamente.\nNombre: {filename}\n"
+                mensaje += f"Campos seleccionados para actualizar: {', '.join(campos_seleccionados)}\n"
                 mensaje += f"Columnas encontradas: {', '.join(self.df.columns)}\n"
+                
+                if columnas_faltantes:
+                    mensaje += f"\nAdvertencia: Columnas recomendadas faltantes: {', '.join(columnas_faltantes)}"
+                
                 self.mostrar_mensaje(mensaje)
-        
+
+                self.campos_a_actualizar = campos_seleccionados
+
         except Exception as e:
             self.mostrar_mensaje(f"Error al cargar el archivo: {str(e)}")
 
     def mostrar_datos(self):
-        """Muestra los datos del Excel en el área de texto"""
+        """Muestra resumen y primeros 10 registros del Excel cargado"""
         if self.df is not None:
             info = f"Resumen del archivo:\n"
             info += f"Total de registros: {len(self.df)}\n"
@@ -262,6 +325,12 @@ class AppGUI(ctk.CTk):
             self.mostrar_mensaje(f"Error general en la actualización: {str(e)}")
 
     def mostrar_mensaje(self, mensaje: str):
-        """Muestra un mensaje en el área de texto"""
+        """Muestra un texto en el área principal"""
         self.text_area.delete("1.0", tk.END)
-        self.text_area.insert("1.0", mensaje) 
+        self.text_area.insert("1.0", mensaje)
+
+    def hacer_alerta_si_bloqueada(self, event=None):
+        """Emite un sonido de alerta si la ventana secundaria está abierta"""
+        if hasattr(self, "ventana_seleccion") and self.ventana_seleccion is not None and self.ventana_seleccion.winfo_exists():
+            self.bell()
+            return "break"  # Evita que el evento siga propagándose
