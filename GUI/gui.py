@@ -127,7 +127,7 @@ class AppGUI(ctk.CTk):
         self.main_frame.bind("<Key>", self.hacer_alerta_si_bloqueada)
         self.bind("<FocusIn>", self.hacer_alerta_si_bloqueada)
 
-        opciones = ["costAct", "costAnt", "costProm", "precioi1", "precioi2", "precioi3"]
+        opciones = ["CostAct", "CostAnt", "costProm", "PrecioIU1", "PrecioIU2", "PrecioIU3"]
 
         label = ctk.CTkLabel(ventana, text="Selecciona los campos a actualizar:", font=ctk.CTkFont(size=14, weight="bold"))
         label.pack(pady=10)
@@ -172,7 +172,7 @@ class AppGUI(ctk.CTk):
                 self.archivo_excel = filename
                 self.df = pd.read_excel(filename)
                 
-                if 'codprod' not in self.df.columns:
+                if 'CodProd' not in self.df.columns:
                     self.mostrar_mensaje("Error: El archivo debe contener la columna 'codprod'")
                     self.df = None
                     return
