@@ -141,6 +141,24 @@ class AppGUI(ctk.CTk):
                 self.tree.column(col, width=160, anchor="center")
         self.after(200, mostrar_y_reaplicar)
 
+    def ajustar_columnas(self, columnas, ancho_total=None):
+        # Si no se especifica ancho_total, usar el ancho actual de la tabla
+        if ancho_total is None:
+            self.update_idletasks()
+            ancho_total = self.tree.winfo_width() or 1200
+        n = len(columnas)
+        if n == 0:
+            return
+        # Si hay pocas columnas, que sean anchas; si hay muchas, que se ajusten
+        if n <= 4:
+            ancho = max(int(ancho_total / n), 220)
+        elif n <= 8:
+            ancho = max(int(ancho_total / n), 120)
+        else:
+            ancho = max(int(ancho_total / n), 80)
+        for col in columnas:
+            self.tree.column(col, width=ancho, anchor="center", stretch=False)
+
     def mostrar_datos_en_tabla(self, df):
         self.tree.delete(*self.tree.get_children())
         # Eliminar todas las columnas previas
@@ -151,14 +169,11 @@ class AppGUI(ctk.CTk):
         self.tree['columns'] = columnas_a_mostrar
         for col in columnas_a_mostrar:
             self.tree.heading(col, text=col)
-            self.tree.column(col, width=260, anchor="center", stretch=False)
         for idx, row in df.iterrows():
             values = [row.get(col, '') for col in columnas_a_mostrar]
             self.tree.insert('', 'end', iid=idx, values=values)
-        # Forzar el tamaño fijo después de insertar
-        self.tree.update_idletasks()
-        for col in columnas_a_mostrar:
-            self.tree.column(col, width=260, anchor="center", stretch=False)
+        # Ajustar columnas de forma inteligente
+        self.ajustar_columnas(columnas_a_mostrar)
 
     def editar_celda(self, event):
         """Permite editar una celda de la tabla (excepto codprod)."""
@@ -211,13 +226,11 @@ class AppGUI(ctk.CTk):
         for col in self.tree['columns']:
             self.tree.heading(col, text="")
             self.tree.column(col, width=0)
-        self.tree['columns'] = ["codprod", "estado", "detalle"]
-        for col in self.tree['columns']:
+        columnas_resultado = ["codprod", "estado", "detalle"]
+        self.tree['columns'] = columnas_resultado
+        for col in columnas_resultado:
             self.tree.heading(col, text=col)
-            self.tree.column(col, width=1100, anchor="center", stretch=False)
         for codprod, estado, detalle in resultados:
             self.tree.insert('', 'end', values=(codprod, estado, detalle))
-        # Forzar el tamaño fijo después de insertar
-        self.tree.update_idletasks()
-        for col in self.tree['columns']:
-            self.tree.column(col, width=1100, anchor="center", stretch=False)
+        # Ajustar columnas de forma inteligente
+        self.ajustar_columnas(columnas_resultado)
