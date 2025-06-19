@@ -38,3 +38,25 @@ except Exception as e:
 #         conexion.close()
 #         print("Conexión cerrada")
 
+def update_producto(codprod, campos_dict):
+    """
+    Actualiza los campos indicados para el producto con el codprod dado.
+    campos_dict: diccionario {campo: valor}
+    """
+    if not campos_dict:
+        return False, "No hay campos para actualizar"
+    try:
+        cursor = conexion.cursor()
+        set_clauses = []
+        valores = []
+        for campo, valor in campos_dict.items():
+            set_clauses.append(f"{campo} = ?")
+            valores.append(valor)
+        sql = f"UPDATE SAPROD SET {', '.join(set_clauses)} WHERE codprod = ?"
+        valores.append(codprod)
+        cursor.execute(sql, valores)
+        conexion.commit()
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
