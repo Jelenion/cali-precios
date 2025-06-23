@@ -24,10 +24,24 @@ COLORES = {
     "hover": "#535878"             # Color hover para botones
 }
 
+COLUMN_ALIASES = {
+    "costAct": "Costo Actual",
+    "costAnt": "Costo Anterior",
+    "costPro": "Costo Promedio",
+    "precioi1": "Precio 1",
+    "precioi2": "Precio 2",
+    "precioi3": "Precio 3",
+    "codprod": "Código Producto"
+}
+
 def configurar_estilo_tabla():
     style = ttk.Style()
     style.theme_use('default')
     
+    # Fuente moderna para filas y encabezados
+    fuente_fila = ('Segoe UI', 12)
+    fuente_encabezado = ('Segoe UI Semibold', 13)
+
     # Configurar el estilo de la tabla
     style.configure(
         "Custom.Treeview",
@@ -35,7 +49,8 @@ def configurar_estilo_tabla():
         foreground=COLORES["texto_oscuro"],
         fieldbackground=COLORES["fondo_tabla"],
         borderwidth=0,
-        rowheight=30
+        rowheight=32,
+        font=fuente_fila
     )
     
     # Configurar el estilo de los encabezados
@@ -45,7 +60,7 @@ def configurar_estilo_tabla():
         foreground=COLORES["texto_claro"],
         borderwidth=1,
         relief="flat",
-        font=('Segoe UI', 10, 'bold')
+        font=fuente_encabezado
     )
     
     # Configurar selección
@@ -56,17 +71,34 @@ def configurar_estilo_tabla():
     )
 
 def obtener_conexion():
+    import pyodbc
+    # Detectar el driver instalado
+    drivers = [d for d in pyodbc.drivers() if 'SQL Server' in d]
+    if not drivers:
+        import tkinter.messagebox as mbox
+        mbox.showerror("Error de conexión", "No se encontró ningún driver ODBC para SQL Server instalado.\nInstala 'ODBC Driver 18 for SQL Server' o 'ODBC Driver 17 for SQL Server'.")
+        return None
+    # Preferir el 18, luego el 17, luego el primero disponible
+    driver = None
+    for preferido in ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server"]:
+        if preferido in drivers:
+            driver = preferido
+            break
+    if not driver:
+        driver = drivers[-1]
     try:
         conexion = pyodbc.connect(
-            'DRIVER={ODBC Driver 18 for SQL Server};'
-            'SERVER=192.168.0.106;'
+            f'DRIVER={{{driver}}};'
+            'SERVER=DESKTOP-ETTD339;'
             'DATABASE=hcdb2;'
             'UID=sa;'
-            'PWD=root;'
+            'PWD=12345678;'
             'TrustServerCertificate=yes'
         )
         return conexion
     except Exception as e:
+        import tkinter.messagebox as mbox
+        mbox.showerror("Error de conexión", f"Driver usado: {driver}\n{str(e)}")
         print("Error de conexión:", e)
         return None
 
@@ -78,8 +110,9 @@ class AppGUI(ctk.CTk):
         self.campos_a_actualizar = []
 
         self.title("Helados Cali - Gestor de Precios")
-        self.geometry("1280x800")
         self.configure(bg=COLORES["fondo"])
+        # Maximizar ventana de forma robusta multiplataforma
+        self.after(100, self.maximizar_ventana)
         
         # Configurar el estilo de la tabla
         configurar_estilo_tabla()
@@ -90,12 +123,24 @@ class AppGUI(ctk.CTk):
         self.crear_panel_lateral()
         self.crear_marco_principal()
 
+    def maximizar_ventana(self):
+        try:
+            self.state('zoomed')  # Windows
+        except Exception:
+            try:
+                self.attributes('-zoomed', True)  # Linux
+            except Exception:
+                # Fallback: pantalla completa
+                self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+
     def crear_panel_lateral(self):
         self.sidebar_frame = ctk.CTkFrame(
             self,
-            fg_color=COLORES["primario"],
+            fg_color=(COLORES["primario"], "#1a1a2e80"),  # Transparencia
             width=250,
-            corner_radius=0
+            corner_radius=20,
+            border_width=2,
+            border_color=COLORES["borde"]
         )
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
@@ -160,27 +205,27 @@ class AppGUI(ctk.CTk):
         version.grid(row=5, column=0, pady=(0, 20))
 
     def crear_marco_principal(self):
-        # Marco principal con efecto de elevación
+        # Marco principal con efecto de elevación y transparencia
         self.main_frame = ctk.CTkFrame(
             self,
-            fg_color=COLORES["fondo_tabla"],
-            corner_radius=15,
-            border_width=1,
+            fg_color=(COLORES["fondo_tabla"], "#ffffffcc"),  # Transparencia
+            corner_radius=25,
+            border_width=2,
             border_color=COLORES["borde"]
         )
-        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=25, pady=25)
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=35, pady=35)
 
         # Título con estilo moderno
         titulo_frame = ctk.CTkFrame(
             self.main_frame,
             fg_color="transparent"
         )
-        titulo_frame.pack(fill="x", padx=20, pady=(20, 0))
+        titulo_frame.pack(fill="x", padx=30, pady=(30, 0))
 
         gradient_label = ctk.CTkLabel(
             titulo_frame,
             text="Sistema de Gestión de Precios",
-            font=ctk.CTkFont(size=24, weight="bold"),
+            font=ctk.CTkFont(size=28, weight="bold"),
             text_color=COLORES["texto_oscuro"]
         )
         gradient_label.pack(side="left", pady=(0, 10))
@@ -188,15 +233,16 @@ class AppGUI(ctk.CTk):
         # Área de contenido inicial
         self.contenido_frame = ctk.CTkFrame(
             self.main_frame,
-            fg_color="transparent"
+            fg_color=(COLORES["fondo"], "#f5f5f7cc"),  # Transparencia
+            corner_radius=18
         )
-        self.contenido_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        self.contenido_frame.pack(fill="both", expand=True, padx=30, pady=30)
 
         # Mensaje inicial
         mensaje_inicial = ctk.CTkLabel(
             self.contenido_frame,
             text="Carga un archivo Excel para comenzar",
-            font=ctk.CTkFont(size=16),
+            font=ctk.CTkFont(size=18, weight="bold"),
             text_color=COLORES["acento"]
         )
         mensaje_inicial.pack(expand=True)
@@ -270,12 +316,12 @@ class AppGUI(ctk.CTk):
         )
         btn_all.pack(side="left", padx=8)
 
-        # Checkboxes de columnas con estilo mejorado
+        # Checkboxes de columnas con alias
         for col in columnas:
             self.col_vars[col] = tk.BooleanVar(value=False)
             cb = ctk.CTkCheckBox(
                 checks_frame,
-                text=col,
+                text=COLUMN_ALIASES.get(col, col),
                 variable=self.col_vars[col],
                 command=lambda c=col: toggle_col(c),
                 font=ctk.CTkFont(size=13),
@@ -302,10 +348,12 @@ class AppGUI(ctk.CTk):
         tree_scroll_x = ttk.Scrollbar(table_frame, orient="horizontal")
         tree_scroll_x.pack(side="bottom", fill="x")
 
-        # Tabla mejorada
+        # Tabla mejorada con alias en los encabezados
+        display_columns = [col for col in self.df.columns]
+        display_column_names = [COLUMN_ALIASES.get(col, col) for col in display_columns]
         tree = ttk.Treeview(
             table_frame,
-            columns=list(self.df.columns),
+            columns=display_column_names,
             show="headings",
             style="Custom.Treeview",
             yscrollcommand=tree_scroll_y.set,
@@ -316,25 +364,21 @@ class AppGUI(ctk.CTk):
         tree_scroll_y.config(command=tree.yview)
         tree_scroll_x.config(command=tree.xview)
 
-        # Configurar columnas
-        for col in self.df.columns:
-            tree.heading(col, text=col)
-            # Ajustar ancho según el contenido
+        # Configurar columnas con alias
+        for idx, col in enumerate(display_columns):
+            alias = COLUMN_ALIASES.get(col, col)
+            tree.heading(alias, text=alias)
             max_width = max(
                 len(str(self.df[col].max())),
                 len(str(self.df[col].min())),
-                len(col)
+                len(alias)
             ) * 10
-            tree.column(col, width=min(max_width, 200), anchor="center")
+            tree.column(alias, width=min(max_width, 200), anchor="center")
 
-        # Insertar datos con estilo alternado
+        # Insertar datos con fondo blanco en todas las filas
         for i, (_, row) in enumerate(self.df.head(100).iterrows()):
-            tag = 'even' if i % 2 == 0 else 'odd'
-            tree.insert("", "end", values=list(row), tags=(tag,))
-
-        # Configurar colores alternados para las filas
-        tree.tag_configure('odd', background=COLORES["fondo"])
-        tree.tag_configure('even', background=COLORES["fondo_tabla"])
+            values = [row[col] for col in display_columns]
+            tree.insert("", "end", values=values)
 
         tree.pack(fill="both", expand=True)
 
@@ -347,7 +391,7 @@ class AppGUI(ctk.CTk):
 
         ayuda = ctk.CTkLabel(
             ayuda_frame,
-            text="Selecciona las columnas a actualizar. La columna 'codprod' es obligatoria y no editable.",
+            text="Selecciona las columnas a actualizar. La columna 'Código Producto' es obligatoria y no editable.",
             font=ctk.CTkFont(size=13),
             text_color=COLORES["acento"]
         )
@@ -394,6 +438,34 @@ class AppGUI(ctk.CTk):
             self.mostrar_mensaje("No hay datos cargados o campos seleccionados.")
             return
 
+        # Validar valores vacíos o inválidos antes de actualizar
+        codigos_vacios = []
+        columnas_invalidas = set()
+        for idx, fila in self.df.iterrows():
+            codprod = fila.get("codprod")
+            if pd.isna(codprod):
+                codigos_vacios.append(f"Fila {idx+2} (Código vacío)")
+                continue
+            for campo in self.campos_a_actualizar:
+                valor = fila.get(campo)
+                if pd.isna(valor) or valor == "":
+                    codigos_vacios.append(f"{COLUMN_ALIASES.get(campo, campo)} en Código {codprod}")
+
+        if codigos_vacios or columnas_invalidas:
+            mensaje = "No se realizó la actualización por los siguientes errores:\n\n"
+            if codigos_vacios:
+                mensaje += "Valores vacíos en: " + ", ".join(codigos_vacios[:10])
+                if len(codigos_vacios) > 10:
+                    mensaje += f" ... (total {len(codigos_vacios)})"
+                mensaje += "\n"
+            if columnas_invalidas:
+                mensaje += "Valores inválidos en: " + ", ".join(list(columnas_invalidas)[:10])
+                if len(columnas_invalidas) > 10:
+                    mensaje += f" ... (total {len(columnas_invalidas)})"
+                mensaje += "\n"
+            self.mostrar_mensaje(mensaje)
+            return
+
         conn = obtener_conexion()
         if conn is None:
             self.mostrar_mensaje("Error al conectar con la base de datos.")
@@ -402,37 +474,101 @@ class AppGUI(ctk.CTk):
         cursor = conn.cursor()
         errores = 0
         actualizados = 0
+        codigos_actualizados = []
+        codigos_error = []
 
         for _, fila in self.df.iterrows():
             codprod = fila.get("codprod")
             if pd.isna(codprod):
                 errores += 1
+                codigos_error.append("(vacío)")
                 continue
 
-            campos_set = []
-            valores = []
-
-            for campo in self.campos_a_actualizar:
-                valor = fila.get(campo)
-                if pd.isna(valor):
-                    valor = None
-                campos_set.append(f"{campo} = ?")
-                valores.append(valor)
-
-            valores.append(codprod)
+            # No actualizar si el costo es 0 (costAct, costAnt, costPro)
+            costo_cero = False
+            for cost_col in ["costAct", "costAnt", "costPro"]:
+                if cost_col in self.df.columns:
+                    valor = fila.get(cost_col)
+                    if not pd.isna(valor) and float(valor) == 0:
+                        costo_cero = True
+                        break
+            if costo_cero:
+                errores += 1
+                codigos_error.append(f"{codprod} (Costo en 0)")
+                continue
 
             try:
-                sql = f"UPDATE SAPROD SET {', '.join(campos_set)} WHERE CODPROD = ?"
-                cursor.execute(sql, valores)
-                actualizados += 1
+                # Si se va a actualizar costAct, primero pasar el valor actual a costAnt y calcular costPro
+                if "costAct" in self.campos_a_actualizar:
+                    cursor.execute("SELECT costAct FROM SAPROD WHERE CODPROD = ?", codprod)
+                    row = cursor.fetchone()
+                    if row is not None:
+                        valor_actual_costAct = row[0]
+                        cursor.execute("UPDATE SAPROD SET costAnt = ? WHERE CODPROD = ? AND Activo = 1 AND EsEnser = 0", valor_actual_costAct, codprod)
+                        # Calcular el nuevo costPro como promedio entre el nuevo costAct y el nuevo costAnt
+                        nuevo_costAct = fila.get("costAct")
+                        try:
+                            costAnt_val = float(valor_actual_costAct) if valor_actual_costAct is not None else 0
+                            costAct_val = float(nuevo_costAct) if nuevo_costAct is not None else 0
+                            costPro = (costAnt_val + costAct_val) / 2
+                        except Exception:
+                            costPro = None
+                        cursor.execute("UPDATE SAPROD SET costPro = ? WHERE CODPROD = ? AND Activo = 1 AND EsEnser = 0", costPro, codprod)
+                # Ahora armar el update normal
+                campos_set = []
+                valores = []
+                for campo in self.campos_a_actualizar:
+                    valor = fila.get(campo)
+                    if pd.isna(valor):
+                        valor = None
+                    campos_set.append(f"{campo} = ?")
+                    valores.append(valor)
+                valores.append(codprod)
+                sql = f"UPDATE SAPROD SET {', '.join(campos_set)} WHERE CODPROD = ? AND Activo = 1 AND EsEnser = 0"
+                result = cursor.execute(sql, valores)
+                if cursor.rowcount > 0:
+                    actualizados += 1
+                    codigos_actualizados.append(str(codprod))
+                else:
+                    # Consultar motivo exacto
+                    cursor.execute("SELECT Activo, EsEnser FROM SAPROD WHERE CODPROD = ?", codprod)
+                    row = cursor.fetchone()
+                    if row is not None:
+                        activo_db, es_enser_db = row
+                        if activo_db != 1:
+                            codigos_error.append(f"{codprod} (No activo)")
+                        elif es_enser_db != 0:
+                            codigos_error.append(f"{codprod} (EsEnser ≠ 0)")
+                        else:
+                            codigos_error.append(f"{codprod} (No actualizado)")
+                    else:
+                        codigos_error.append(f"{codprod} (No encontrado en BD)")
+                    errores += 1
             except Exception as e:
                 errores += 1
-                print(f"Error en fila con codprod {codprod}: {e}")
+                codigos_error.append(f"{codprod} (Error SQL)")
+                self.mostrar_mensaje(f"Error en fila con Código Producto {codprod}: {e}")
 
         conn.commit()
         conn.close()
 
-        self.mostrar_mensaje(f"Actualización completada.\nRegistros actualizados: {actualizados}\nErrores: {errores}")
+        resumen = f"Actualización completada.\n"
+        resumen += f"Registros actualizados: {actualizados}\n"
+        resumen += f"Errores: {errores}\n"
+        resumen += f"Columnas actualizadas: {', '.join([COLUMN_ALIASES.get(c, c) for c in self.campos_a_actualizar])}\n\n"
+        if codigos_actualizados:
+            resumen += f"Códigos actualizados: {', '.join(codigos_actualizados[:20])}"
+            if len(codigos_actualizados) > 20:
+                resumen += f" ... (total {len(codigos_actualizados)})\n"
+            else:
+                resumen += "\n"
+        if codigos_error:
+            resumen += f"Códigos con error: {', '.join(codigos_error[:10])}"
+            if len(codigos_error) > 10:
+                resumen += f" ... (total {len(codigos_error)})\n"
+            else:
+                resumen += "\n"
+        self.mostrar_mensaje(resumen)
 
 if __name__ == "__main__":
     app = AppGUI()
